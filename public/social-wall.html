@@ -3,73 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hochzeits Meme Wall</title>
+    <title>Hochzeits-Meme Wall</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="social-wall">
+    <h1>Eure Hochzeits-Memes</h1>
     <div id="memeWall">
         <p>Lade Memes...</p>
     </div>
 
+    <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            const memeWall = document.getElementById('memeWall');
-            // WICHTIG: Ersetze DIESEN PLATZHALTER durch die URL deines Render.com Backends!
-            // Beispiel: https://hochzeit-meme-backend.onrender.com
-            const BACKEND_BASE_URL = 'http://localhost:3000'; 
-            const FETCH_INTERVAL = 10000; // Alle 10 Sekunden neue Memes abrufen
-            let memes = [];
-            
-            async function fetchMemes() {
-                try {
-                    // Beachte den Endpunkt: '/memes-list', nicht '/memes'
-                    const response = await fetch(`${BACKEND_BASE_URL}/memes-list`);
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    const newMemes = await response.json();
-                    
-                    // Nur neue Memes hinzufügen und sortieren, damit die neuesten zuerst erscheinen
-                    // Wir müssen auch prüfen, ob sich die Reihenfolge geändert hat (z.B. neue Memes kommen)
-                    // Eine einfache Lösung, um Duplikate zu vermeiden und trotzdem neue Memes zu zeigen:
-                    const existingMemeUrls = new Set(memes);
-                    const newlyAddedMemes = newMemes.filter(url => !existingMemeUrls.has(url));
+        // --- Konfiguration des Backends ---
+        let BACKEND_BASE_URL;
+        // Bestimme die Backend-URL basierend auf der aktuellen Umgebung
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            BACKEND_BASE_URL = 'http://localhost:3000'; // Lokale Entwicklung
+        } else {
+            // Für Render.com oder andere Produktionsumgebungen
+            // WICHTIG: Ersetze 'https://DEINE_BACKEND_URL.onrender.com' durch die tatsächliche URL deines Render.com Backends!
+            BACKEND_BASE_URL = 'https://memes-wall.onrender.com';
+        }
 
-                    if (newlyAddedMemes.length > 0 || newMemes.length !== memes.length) {
-                        // Füge neue Memes am Anfang hinzu und sorge für die richtige Sortierung
-                        // Oder lade einfach immer die komplette Liste neu, wenn sich was ändert.
-                        memes = newMemes; // Einfach die Liste komplett neu setzen
-                        renderMemes();
-                    }
+        // API-Key für das Frontend
+        // WICHTIG: Dieser Key MUSS EXAKT mit dem API_KEY in deiner Backend-Konfiguration übereinstimmen!
+        const FRONTEND_API_KEY = '0a7db09c6859445f802cf0ea4836507f'; // <--- HIER DEINEN API-KEY EINFÜGEN!
 
-                } catch (error) {
-                    console.error('Fehler beim Abrufen der Memes:', error);
-                    memeWall.innerHTML = '<p style="color: red;">Fehler beim Laden der Memes.</p>';
+        const FETCH_INTERVAL = 10000; // Alle 10 Sekunden neue Memes abrufen
+        const memeWall = document.getElementById('memeWall');
+        let masonryInstance = null;
+        let memes = [];
+        let initialLoad = true;
+
+        function getRoomIdFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const roomId = params.get('room');
+            if (!roomId) {
+                console.warn("No 'room' parameter found in URL. Using 'default' room.");
+                alert("Achtung: Keine Raum-ID in der URL gefunden. Es wird der Standardraum 'default' verwendet. Bitte stelle sicher, dass du die korrekte URL verwendest (z.B. ?room=deineHochzeitsID).");
+                return 'default';
+            }
+            // Bereinige die Raum-ID, um gültige Ordnernamen zu gewährleisten (falls nicht schon im Backend)
+            return roomId.replace(/[^a-zA-Z0-9_-]/g, '');
+        }
+        const currentRoomId = getRoomIdFromUrl();
+
+        async function fetchMemes() {
+            if (!FRONTEND_API_KEY) {
+                console.error("API Key not loaded yet. Cannot fetch memes.");
+                if (initialLoad) {
+                    memeWall.innerHTML = '<p style="color: red;">Fehler: API Key konnte nicht geladen werden. Versuche es später erneut.</p>';
                 }
+                return;
             }
 
-            function renderMemes() {
-                memeWall.innerHTML = ''; // Vorherige Memes entfernen
-                if (memes.length === 0) {
-                    memeWall.innerHTML = '<p>Noch keine Memes vorhanden. Sei der Erste!</p>';
-                    return;
-                }
+            const fetchUrl = `${BACKEND_BASE_URL}/memes-list/${currentRoomId}`;
 
-                memes.forEach(url => {
-                    const memeCard = document.createElement('div');
-                    memeCard.classList.add('meme-card');
-                    const img = document.createElement('img');
-                    img.src = url;
-                    img.alt = 'Hochzeit Meme';
-                    memeCard.appendChild(img);
-                    memeWall.appendChild(memeCard);
+            try {
+                const response = await fetch(fetchUrl, {
+                    method: 'GET',
+                    headers: {
+                        'X-API-Key': FRONTEND_API_KEY
+                    }
                 });
-                memeWall.classList.add('loaded'); // Wall einblenden
+
+                if (!response.ok) {
+                    // Versuche, eine detailliertere Fehlermeldung vom Backend zu erhalten
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! Status: ${response.status}. Message: ${errorText}`);
+                }
+
+                const newMemes = await response.json();
+
+                if (JSON.stringify(newMemes) !== JSON.stringify(memes)) {
+                    memes = newMemes;
+                    renderMemes();
+                } else if (initialLoad && memes.length === 0) {
+                    memeWall.innerHTML = '<p>Noch keine Memes vorhanden. Sei der Erste, der eines erstellt!</p>';
+                }
+                initialLoad = false;
+
+            } catch (error) {
+                console.error('Fehler beim Abrufen der Memes:', error);
+                if (initialLoad) {
+                    memeWall.innerHTML = `<p style="color: red;">Fehler beim Laden der Memes: ${error.message}. Versuche es später erneut.</p>`;
+                }
+                initialLoad = false;
+            }
+        }
+
+        async function deleteMeme(memeUrl) {
+            if (!FRONTEND_API_KEY) {
+                alert('API Key nicht geladen. Kann Meme nicht löschen.');
+                console.error("API Key is missing for delete.");
+                return;
             }
 
-            // Initiales Laden der Memes
+            const confirmDelete = confirm('Bist du sicher, dass du dieses Meme löschen möchtest?');
+            if (!confirmDelete) {
+                return;
+            }
+
+            const urlParts = memeUrl.split('/');
+            const filename = urlParts[urlParts.length - 1];
+
+            if (!filename || !filename.startsWith('meme-') || !filename.endsWith('.png')) {
+                console.error('Ungültiger Dateiname für Löschoperation:', filename);
+                alert('Fehler: Ungültige Meme-URL zum Löschen.');
+                return;
+            }
+
+            const deleteUrl = `${BACKEND_BASE_URL}/delete-meme/${currentRoomId}/${filename}`;
+
+            try {
+                const response = await fetch(deleteUrl, {
+                    method: 'DELETE',
+                    headers: {
+                        'X-API-Key': FRONTEND_API_KEY
+                    }
+                });
+
+                if (response.ok) {
+                    alert('Meme erfolgreich gelöscht!');
+                    await fetchMemes();
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(`Delete failed: ${errorData.message}`);
+                }
+            } catch (error) {
+                console.error('Fehler beim Löschen des Memes:', error);
+                alert(`Ein Fehler ist beim Löschen des Memes aufgetreten: ${error.message || 'Unbekannter Fehler'}`);
+            }
+        }
+
+        function renderMemes() {
+            if (!memeWall) return;
+
+            if (masonryInstance) {
+                masonryInstance.destroy();
+                masonryInstance = null;
+            }
+
+            memeWall.innerHTML = '';
+
+            if (memes.length === 0) {
+                memeWall.innerHTML = '<p>Noch keine Memes vorhanden. Sei der Erste, der eines erstellt!</p>';
+                return;
+            }
+
+            const fragment = document.createDocumentFragment();
+
+            memes.forEach(url => {
+                const memeCard = document.createElement('div');
+                memeCard.classList.add('meme-card');
+
+                const img = document.createElement('img');
+                img.src = url;
+                img.alt = 'Hochzeitsmeme';
+                img.onload = () => {
+                    if (masonryInstance) {
+                        masonryInstance.layout();
+                    }
+                };
+                img.onerror = () => {
+                    console.error(`Fehler beim Laden des Bildes: ${url}`);
+                    // Fallback-Text oder Icon anzeigen, wenn Bild nicht geladen werden kann
+                    const errorText = document.createElement('p');
+                    errorText.textContent = 'Bild konnte nicht geladen werden.';
+                    errorText.style.color = 'red';
+                    memeCard.replaceChild(errorText, img); // Ersetze das img durch den Fehlertext
+                };
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = 'Löschen';
+                deleteBtn.classList.add('delete-meme-btn');
+                deleteBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deleteMeme(url);
+                });
+
+                memeCard.appendChild(img);
+                memeCard.appendChild(deleteBtn);
+                fragment.appendChild(memeCard);
+            });
+
+            memeWall.appendChild(fragment);
+
+            setTimeout(() => {
+                masonryInstance = new Masonry(memeWall, {
+                    itemSelector: '.meme-card',
+                    columnWidth: '.meme-card',
+                    gutter: 20,
+                    percentPosition: true
+                });
+                memeWall.classList.add('loaded');
+            }, 100);
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
             fetchMemes();
-            // Regelmäßiges Abrufen neuer Memes
             setInterval(fetchMemes, FETCH_INTERVAL);
         });
     </script>

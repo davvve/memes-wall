@@ -1,287 +1,390 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const imageUpload = document.getElementById('imageUpload');
-    const imagePreview = document.getElementById('imagePreview');
-    const memeCanvasContainer = document.getElementById('memeCanvasContainer');
-    const memeCanvas = document.getElementById('memeCanvas');
-    const ctx = memeCanvas.getContext('2d');
-    const memeTextarea = document.getElementById('memeText');
-    const fontSizeInput = document.getElementById('fontSize');
-    const addTextBtn = document.getElementById('addTextBtn');
-    const generateMemeBtn = document.getElementById('generateMemeBtn');
+// Konfiguration des Backends (Backend-URL von Render.com)
+let BACKEND_BASE_URL;
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    BACKEND_BASE_URL = 'http://localhost:3000'; // Lokale Entwicklung
+} else {
+    // Für Render.com Produktionsumgebung
+    BACKEND_BASE_URL = 'https://memes-wall.onrender.com'; // <--- HIER ANPASSEN!
+}
 
-    // WICHTIG: Ersetze DIESEN PLATZHALTER durch die URL deines Render.com Backends!
-    // Beispiel: https://hochzeit-meme-backend.onrender.com
-    const BACKEND_BASE_URL = 'http://localhost:3000';
+// API-Key für das Frontend
+// WARNUNG: Dieser Key ist im Browser sichtbar! Für ein einfaches Hochzeitsprojekt ist das oft akzeptabel.
+// WICHTIG: Füge hier den GLEICHEN API-Key ein, den du bei Render.com als "API_KEY" hinterlegt hast!
+const FRONTEND_API_KEY = '0a7db09c6859445f802cf0ea4836507f';
 
-    let currentImage = null;
-    let textElements = []; // Speichert alle Text-Elemente mit ihren Eigenschaften
-    let selectedTextElement = null; // Das gerade ausgewählte Text-Element für Drag & Drop
-    let isDragging = false;
-    let isResizing = false;
-    let startX, startY; // Startkoordinaten für Drag & Drop und Größenänderung
+// --- DOM-Elemente abrufen ---
+const imageUpload = document.getElementById('imageUpload');
+const imagePreview = document.getElementById('imagePreview');
+const memeCanvas = document.getElementById('memeCanvas');
+const ctx = memeCanvas.getContext('2d');
+const topTextInput = document.getElementById('topTextInput');
+const bottomTextInput = document.getElementById('bottomTextInput');
+const fontSizeControl = document.getElementById('fontSizeControl');
+const generateAndSaveBtn = document.getElementById('generateAndSaveBtn');
 
-    // --- Bild-Upload und Vorschau ---
-    imageUpload.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    currentImage = img;
-                    // Skaliere das Bild für die Anzeige im Editor, falls es zu groß ist
-                    const maxWidth = 550; // Max Breite für den Editor
-                    const maxHeight = 400; // Max Höhe für den Editor
-                    let width = img.width;
-                    let height = img.height;
+let currentImage = null; // Das geladene Bildobjekt
+let memeTexts = []; // Array zum Speichern der Textfelder {text, x, y, size, color, font, align, stroke, strokeWidth}
+let selectedTextIndex = -1; // Index des aktuell ausgewählten/gezogenen Textfeldes
+let dragOffsetX, dragOffsetY; // Offset für Drag-Operationen
 
-                    if (width > maxWidth) {
-                        height = height * (maxWidth / width);
-                        width = maxWidth;
-                    }
-                    if (height > maxHeight) {
-                        width = width * (maxHeight / height);
-                        height = maxHeight;
-                    }
+// --- Multi-Room Fähigkeit: Raum-ID aus der URL lesen ---
+function getRoomIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get('room');
+    if (!roomId) {
+        console.warn("No 'room' parameter found in URL. Using 'default' room.");
+        alert("Achtung: Keine Raum-ID in der URL gefunden. Es wird der Standardraum 'default' verwendet. Bitte stelle sicher, dass du die korrekte URL verwendest (z.B. ?room=deineHochzeitsID).");
+        return 'default'; // Fallback auf einen Standardraum
+    }
+    // Einfache Bereinigung der Raum-ID, um gültige Ordnernamen zu gewährleisten
+    return roomId.replace(/[^a-zA-Z0-9_-]/g, '');
+}
+const currentRoomId = getRoomIdFromUrl();
 
-                    memeCanvas.width = img.width; // Der Canvas selbst bekommt Originalgröße für Qualität
-                    memeCanvas.height = img.height;
-                    
-                    memeCanvasContainer.style.width = width + 'px';
-                    memeCanvasContainer.style.height = height + 'px';
-                    memeCanvasContainer.style.maxWidth = '100%';
-                    memeCanvasContainer.style.maxHeight = '400px'; // Oder eine feste Höhe, die du möchtest
-                    
-                    drawMeme(); // Bild auf Canvas zeichnen
-                    imagePreview.style.display = 'none'; // Vorschau ausblenden
-                    memeCanvasContainer.style.display = 'block'; // Canvas anzeigen
-                    
-                    // Alle vorhandenen Text-Elemente neu positionieren (falls schon welche da waren)
-                    // Da wir den Container skalieren, müssen die Texte relativ dazu positioniert werden
-                    // (Das ist etwas komplexer, für einfaches Drag & Drop lassen wir die Texte 1:1)
-                    // Wenn der Container skaliert wird, verschieben sich die DOM-Textelemente mit
-                    // Die relevanten Koordinaten sind dann die CSS-Left/Top Werte im Verhältnis zum Canvas-Container
-                    // Wenn wir später auf den finalen Canvas zeichnen, müssen wir die Skalierung der DOM-Elemente
-                    // zum Originalbild berücksichtigen.
+// --- Initialisierung und Event-Listener ---
+function initCanvas() {
+    // Canvas mit einer Standardgröße initialisieren
+    memeCanvas.width = 600;
+    memeCanvas.height = 400;
+    ctx.clearRect(0, 0, memeCanvas.width, memeCanvas.height);
+    drawPlaceholderText();
+}
 
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+function drawPlaceholderText() {
+    ctx.fillStyle = '#ccc';
+    ctx.font = '24px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('Lade ein Bild hoch, um dein Meme zu erstellen.', memeCanvas.width / 2, memeCanvas.height / 2);
+}
+
+function setupEventListeners() {
+    // Bild-Upload per Drag & Drop
+    imagePreview.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        imagePreview.classList.add('drag-over');
+    });
+    imagePreview.addEventListener('dragleave', () => {
+        imagePreview.classList.remove('drag-over');
+    });
+    imagePreview.addEventListener('drop', (e) => {
+        e.preventDefault();
+        imagePreview.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+            handleImageFile(e.dataTransfer.files[0]);
         }
     });
 
-    // --- Text hinzufügen ---
-    addTextBtn.addEventListener('click', () => {
-        const text = memeTextarea.value.trim();
-        if (text && currentImage) {
-            const fontSize = parseInt(fontSizeInput.value);
-            
-            // Initialposition: unten mittig auf dem Bild relativ zum Canvas-Container
-            // Wir müssen die Größe des Canvas-Containers berücksichtigen, nicht des Canvas selbst
-            const containerWidth = memeCanvasContainer.clientWidth;
-            const containerHeight = memeCanvasContainer.clientHeight;
-
-            const x = containerWidth / 2;
-            const y = containerHeight - 20; // 20px vom unteren Rand
-            addTextToMeme(text, x, y, fontSize);
-            memeTextarea.value = ''; // Textfeld leeren
-        } else if (!currentImage) {
-            alert('Bitte zuerst ein Bild hochladen!');
+    // Bild-Upload per Dateiauswahl
+    imageUpload.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            handleImageFile(e.target.files[0]);
         }
     });
 
-    // Funktion zum Hinzufügen eines Text-Elements zum Meme
-    function addTextToMeme(text, x, y, fontSize) {
-        const textElement = document.createElement('div');
-        textElement.classList.add('meme-text-element');
-        textElement.textContent = text;
-        textElement.style.fontSize = `${fontSize}px`;
-        
-        // Zentrum des Textes an x,y ausrichten
-        textElement.style.left = `${x}px`;
-        textElement.style.top = `${y}px`;
-        textElement.style.transform = 'translate(-50%, -50%)'; 
+    // Texteingaben aktualisieren das Meme in Echtzeit
+    topTextInput.addEventListener('input', drawMeme);
+    bottomTextInput.addEventListener('input', drawMeme);
+    fontSizeControl.addEventListener('input', drawMeme);
 
-        memeCanvasContainer.appendChild(textElement);
-        textElements.push(textElement);
-
-        // Event Listener für Drag & Drop und Größenänderung
-        makeTextDraggableAndResizable(textElement);
-    }
-
-    // --- Drag & Drop für Text-Elemente ---
-    function makeTextDraggableAndResizable(textElement) {
-        let resizeHandle = document.createElement('div');
-        resizeHandle.classList.add('resize-handle'); 
-        textElement.appendChild(resizeHandle);
-
-        const handleMouseDown = (e) => {
-            selectedTextElement = textElement;
-            if (e.target === resizeHandle) {
-                isResizing = true;
-            } else {
-                isDragging = true;
-            }
-            startX = e.clientX || e.touches[0].clientX;
-            startY = e.clientY || e.touches[0].clientY;
-            e.preventDefault(); 
-        };
-
-        const handleMouseMove = (e) => {
-            if (selectedTextElement !== textElement) return;
-
-            const currentX = e.clientX || e.touches[0].clientX;
-            const currentY = e.clientY || e.touches[0].clientY;
-
-            if (isDragging) {
-                let rect = textElement.getBoundingClientRect();
-                let containerRect = memeCanvasContainer.getBoundingClientRect();
-
-                let newX = currentX - startX + rect.left;
-                let newY = currentY - startY + rect.top;
-
-                // Relative Positionierung innerhalb des Containers
-                newX = newX - containerRect.left;
-                newY = newY - containerRect.top;
-
-                // Sicherstellen, dass der Text innerhalb des Containers bleibt
-                newX = Math.max(0, Math.min(newX, containerRect.width - rect.width));
-                newY = Math.max(0, Math.min(newY, containerRect.height - rect.height));
-
-                // Wir setzen left/top als Mittelpunkt, daher müssen wir die halbe Breite/Höhe addieren
-                textElement.style.left = `${newX + rect.width / 2}px`;
-                textElement.style.top = `${newY + rect.height / 2}px`;
-            } else if (isResizing) {
-                const deltaY = currentY - startY;
-                const currentFontSize = parseFloat(textElement.style.fontSize);
-                let newFontSize = currentFontSize + deltaY / 5; // Empfindlichkeit anpassen
-                newFontSize = Math.max(10, Math.min(100, newFontSize)); // Min/Max Schriftgröße
-                textElement.style.fontSize = `${newFontSize}px`;
-            }
-            startX = currentX;
-            startY = currentY;
-            e.preventDefault(); 
-        };
-
-        const handleMouseUp = () => {
-            isDragging = false;
-            isResizing = false;
-            selectedTextElement = null;
-        };
-
-        textElement.addEventListener('mousedown', handleMouseDown);
-        textElement.addEventListener('touchstart', handleMouseDown);
-        document.addEventListener('mousemove', handleMouseMove);
-        document.addEventListener('touchmove', handleMouseMove);
-        document.addEventListener('mouseup', handleMouseUp);
-        document.addEventListener('touchend', handleMouseUp);
-    }
-
-
-    // --- Canvas zeichnen (Bild + Text) ---
-    function drawMeme() {
-        if (!currentImage) return;
-
-        // Setze die Canvas-Größe auf die Größe des Originalbildes
-        memeCanvas.width = currentImage.width;
-        memeCanvas.height = currentImage.height;
-
-        // Zeichne das Bild auf den Canvas
-        ctx.clearRect(0, 0, memeCanvas.width, memeCanvas.height);
-        ctx.drawImage(currentImage, 0, 0, memeCanvas.width, memeCanvas.height);
-    }
-
-    // --- Meme generieren und senden ---
-    generateMemeBtn.addEventListener('click', async () => {
+    // Meme generieren und speichern
+    generateAndSaveBtn.addEventListener('click', async () => {
         if (!currentImage) {
-            alert('Bitte zuerst ein Bild hochladen!');
+            alert('Bitte lade zuerst ein Bild hoch.');
             return;
         }
-
-        // Temporärer Canvas für die finale Bildgenerierung
-        const finalCanvas = document.createElement('canvas');
-        finalCanvas.width = currentImage.width;
-        finalCanvas.height = currentImage.height;
-        const finalCtx = finalCanvas.getContext('2d');
-
-        // Originalbild zeichnen
-        finalCtx.drawImage(currentImage, 0, 0, finalCanvas.width, finalCanvas.height);
-
-        // Skalierungsfaktor zwischen Editor-Container und Originalbild
-        const scaleX = currentImage.width / memeCanvasContainer.clientWidth;
-        const scaleY = currentImage.height / memeCanvasContainer.clientHeight;
-
-        // Alle Text-Elemente auf den finalen Canvas zeichnen
-        textElements.forEach(textElement => {
-            const computedStyle = window.getComputedStyle(textElement);
-            const fontSizePx = parseFloat(computedStyle.fontSize);
-            const fontFamily = computedStyle.fontFamily;
-            const textContent = textElement.textContent;
-
-            finalCtx.font = `${fontSizePx * scaleY}px ${fontFamily}`; // Schriftgröße skalieren
-            finalCtx.textAlign = 'center'; 
-            finalCtx.textBaseline = 'middle'; 
-
-            // Position des Text-Elements relativ zum Canvas-Container
-            // Da wir translate(-50%, -50%) verwenden, ist left/top der Mittelpunkt des Textes
-            const textLeftPx = parseFloat(textElement.style.left);
-            const textTopPx = parseFloat(textElement.style.top);
-
-            // Umrechnung der DOM-Position auf Canvas-Koordinaten mit Skalierung
-            const finalX = textLeftPx * scaleX;
-            const finalY = textTopPx * scaleY;
-
-            // Meme-Textschatten (Schwarz)
-            finalCtx.fillStyle = 'black'; 
-            const shadowOffset = 2 * (scaleX + scaleY) / 2; // Schatten-Offset skalieren
-            finalCtx.fillText(textContent, finalX - shadowOffset, finalY - shadowOffset);
-            finalCtx.fillText(textContent, finalX + shadowOffset, finalY - shadowOffset);
-            finalCtx.fillText(textContent, finalX - shadowOffset, finalY + shadowOffset);
-            finalCtx.fillText(textContent, finalX + shadowOffset, finalY + shadowOffset);
-            
-            // Meme-Text (Weiß)
-            finalCtx.fillStyle = 'white'; 
-            finalCtx.fillText(textContent, finalX, finalY);
-        });
-
-        // Meme als Data URL (PNG) erhalten
-        const imageDataUrl = finalCanvas.toDataURL('image/png');
-
-        try {
-            const response = await fetch(`${BACKEND_BASE_URL}/upload-meme`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ image: imageDataUrl }),
-            });
-
-            if (response.ok) {
-                alert('Meme erfolgreich geteilt und wird auf der Social Wall angezeigt!');
-                resetMemeGenerator();
-            } else {
-                const errorData = await response.json();
-                alert(`Fehler beim Hochladen des Memes: ${errorData.message || response.statusText}`);
-            }
-        } catch (error) {
-            console.error('Fehler beim Senden des Memes:', error);
-            alert('Netzwerkfehler. Bitte überprüfe deine Verbindung.');
-        }
+        drawMeme(true); // Zeichne final, ohne interaktive Elemente
+        const imageDataUrl = memeCanvas.toDataURL('image/png');
+        await uploadMeme(imageDataUrl);
     });
 
-    // --- Zurücksetzen der Meme-Generierung ---
-    function resetMemeGenerator() {
-        currentImage = null;
-        textElements.forEach(el => el.remove()); // Alle Text-Elemente entfernen
-        textElements = [];
-        memeTextarea.value = '';
-        fontSizeInput.value = 40; // Standard-Schriftgröße zurücksetzen
-        imageUpload.value = ''; // Dateiauswahl zurücksetzen
-        imagePreview.style.display = 'flex'; // Vorschau wieder anzeigen
-        memeCanvasContainer.style.display = 'none'; // Canvas ausblenden
-        ctx.clearRect(0, 0, memeCanvas.width, memeCanvas.height); // Canvas leeren
-        memeCanvasContainer.style.width = '100%'; // Containerbreite zurücksetzen
-        memeCanvasContainer.style.height = '300px'; // Containerhöhe zurücksetzen
+    // --- Canvas Interaktion (Ziehen von Textfeldern) ---
+    memeCanvas.addEventListener('mousedown', handleMouseDown);
+    memeCanvas.addEventListener('mousemove', handleMouseMove);
+    memeCanvas.addEventListener('mouseup', handleMouseUp);
+    memeCanvas.addEventListener('mouseout', handleMouseUp); // Falls Maus Canvas verlässt
+    
+    // --- Touch Events für mobile Geräte ---
+    memeCanvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    memeCanvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    memeCanvas.addEventListener('touchend', handleTouchEnd);
+    memeCanvas.addEventListener('touchcancel', handleTouchEnd);
+}
+
+// --- Bildhandling ---
+function handleImageFile(file) {
+    if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                currentImage = img;
+                // Passe Canvas-Größe an Bild an, aber skaliere, wenn zu groß
+                const maxWidth = 800; // Etwas breiter als vorher für mehr Flexibilität
+                const maxHeight = 700; 
+
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height = height * (maxWidth / width);
+                    width = maxWidth;
+                }
+                if (height > maxHeight) {
+                    width = width * (maxHeight / height);
+                    height = maxHeight;
+                }
+                
+                // Mindestgröße für das Canvas, damit es immer sichtbar ist
+                width = Math.max(width, 300);
+                height = Math.max(height, 200);
+
+                memeCanvas.width = width;
+                memeCanvas.height = height;
+
+                // Setze die initialen Textfelder zurück oder neu
+                memeTexts = [
+                    { text: topTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: 50, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'top' },
+                    { text: bottomTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: memeCanvas.height - 30, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'bottom' }
+                ];
+                drawMeme();
+            };
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+        imagePreview.innerHTML = ''; // Leere den Vorschau-Text
+        imagePreview.style.border = 'none'; // Entferne den gestrichelten Rahmen
+    } else {
+        alert('Bitte wähle eine Bilddatei aus.');
+        imageUpload.value = '';
     }
+}
+
+// --- Meme zeichnen ---
+function drawMeme(isFinalRender = false) {
+    ctx.clearRect(0, 0, memeCanvas.width, memeCanvas.height); // Canvas leeren
+
+    if (currentImage) {
+        ctx.drawImage(currentImage, 0, 0, memeCanvas.width, memeCanvas.height);
+    } else {
+        drawPlaceholderText();
+        return; // Kein Bild, kein Meme
+    }
+
+    // Aktualisiere die Texte basierend auf den Input-Feldern
+    memeTexts[0].text = topTextInput.value.toUpperCase();
+    memeTexts[0].size = parseInt(fontSizeControl.value);
+    
+    memeTexts[1].text = bottomTextInput.value.toUpperCase();
+    memeTexts[1].size = parseInt(fontSizeControl.value);
+
+
+    memeTexts.forEach((textObj, index) => {
+        if (!textObj.text) return; // Leere Texte nicht zeichnen
+
+        ctx.font = `${textObj.size}px ${textObj.font}`;
+        ctx.fillStyle = textObj.color;
+        ctx.textAlign = textObj.align;
+        ctx.strokeStyle = textObj.stroke;
+        ctx.lineWidth = textObj.strokeWidth;
+        ctx.lineJoin = 'round'; // Für bessere Ecken beim Text-Outline
+
+        // Schatteneffekt für besseren Kontrast
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 7;
+        ctx.shadowOffsetX = 2;
+        ctx.shadowOffsetY = 2;
+
+        ctx.strokeText(textObj.text, textObj.x, textObj.y);
+        ctx.fillText(textObj.text, textObj.x, textObj.y);
+
+        // Schatten zurücksetzen, damit es andere Elemente nicht beeinflusst
+        ctx.shadowColor = 'transparent';
+        ctx.shadowBlur = 0;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 0;
+
+        // Zeichne den Rahmen nur, wenn es kein finaler Render ist und der Text ausgewählt ist
+        if (!isFinalRender && index === selectedTextIndex) {
+            drawSelectionBox(textObj);
+        }
+    });
+}
+
+function drawSelectionBox(textObj) {
+    // Umrandung des Textfeldes zur Visualisierung
+    ctx.strokeStyle = 'blue';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]); // Gestrichelte Linie
+
+    const textMetrics = ctx.measureText(textObj.text);
+    const textWidth = textMetrics.width;
+    const textHeight = textObj.size * 1.2; // Schätzung der Höhe inklusive Ober- und Unterlängen
+
+    // Bounding box basierend auf textAlign
+    let xOffset = 0;
+    if (textObj.align === 'center') xOffset = textWidth / 2;
+    else if (textObj.align === 'right') xOffset = textWidth;
+
+    // Y ist die Baseline, also muss die Box nach oben gezeichnet werden
+    ctx.strokeRect(textObj.x - xOffset - 5, textObj.y - textHeight + 5, textWidth + 10, textHeight + 5);
+    ctx.setLineDash([]); // Liniendash zurücksetzen
+}
+
+
+// --- Canvas Interaktionslogik ---
+function getClickedTextIndex(mouseX, mouseY) {
+    // Iteriere rückwärts, damit der oberste Text zuerst erkannt wird
+    for (let i = memeTexts.length - 1; i >= 0; i--) {
+        const textObj = memeTexts[i];
+        if (!textObj.text) continue;
+
+        ctx.font = `${textObj.size}px ${textObj.font}`;
+        const textMetrics = ctx.measureText(textObj.text);
+        const textWidth = textMetrics.width;
+        const textHeight = textObj.size * 1.2; // Wie in drawSelectionBox
+
+        let xMin, xMax, yMin, yMax;
+        
+        // Bounding box basierend auf textAlign
+        if (textObj.align === 'center') {
+            xMin = textObj.x - textWidth / 2;
+            xMax = textObj.x + textWidth / 2;
+        } else if (textObj.align === 'right') {
+            xMin = textObj.x - textWidth;
+            xMax = textObj.x;
+        } else { // 'left'
+            xMin = textObj.x;
+            xMax = textObj.x + textWidth;
+        }
+        yMin = textObj.y - textHeight + 5; // Y ist Baseline, Box geht nach oben
+        yMax = textObj.y + 5; // Kleiner Puffer unten
+
+
+        if (mouseX >= xMin && mouseX <= xMax &&
+            mouseY >= yMin && mouseY <= yMax) {
+            return i;
+        }
+    }
+    return -1; // Keinen Text gefunden
+}
+
+function handleMouseDown(e) {
+    const mouseX = e.offsetX;
+    const mouseY = e.offsetY;
+    selectedTextIndex = getClickedTextIndex(mouseX, mouseY);
+
+    if (selectedTextIndex !== -1) {
+        const textObj = memeTexts[selectedTextIndex];
+        dragOffsetX = mouseX - textObj.x;
+        dragOffsetY = mouseY - textObj.y;
+        memeCanvas.style.cursor = 'grabbing';
+        drawMeme(); // Zeichne mit Auswahlbox
+    } else {
+        memeCanvas.style.cursor = 'default';
+    }
+}
+
+function handleMouseMove(e) {
+    if (selectedTextIndex !== -1) {
+        const textObj = memeTexts[selectedTextIndex];
+        textObj.x = e.offsetX - dragOffsetX;
+        textObj.y = e.offsetY - dragOffsetY;
+        drawMeme();
+    } else {
+        // Mauszeiger ändern, wenn über einem Textfeld
+        const mouseX = e.offsetX;
+        const mouseY = e.offsetY;
+        if (getClickedTextIndex(mouseX, mouseY) !== -1) {
+            memeCanvas.style.cursor = 'grab';
+        } else {
+            memeCanvas.style.cursor = 'default';
+        }
+    }
+}
+
+function handleMouseUp() {
+    selectedTextIndex = -1;
+    memeCanvas.style.cursor = 'default';
+    drawMeme(); // Final zeichnen, ohne Auswahlbox
+}
+
+// --- Touch Event Handlers ---
+function handleTouchStart(e) {
+    e.preventDefault(); // Verhindert Scrolling/Zooming des Browsers bei Touch
+    const touch = e.touches[0];
+    const rect = memeCanvas.getBoundingClientRect();
+    const touchX = touch.clientX - rect.left;
+    const touchY = touch.clientY - rect.top;
+
+    selectedTextIndex = getClickedTextIndex(touchX, touchY);
+
+    if (selectedTextIndex !== -1) {
+        const textObj = memeTexts[selectedTextIndex];
+        dragOffsetX = touchX - textObj.x;
+        dragOffsetY = touchY - textObj.y;
+    }
+}
+
+function handleTouchMove(e) {
+    e.preventDefault(); // Verhindert Scrolling/Zooming des Browsers bei Touch
+    if (selectedTextIndex !== -1) {
+        const touch = e.touches[0];
+        const rect = memeCanvas.getBoundingClientRect();
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+
+        const textObj = memeTexts[selectedTextIndex];
+        textObj.x = touchX - dragOffsetX;
+        textObj.y = touchY - dragOffsetY;
+        drawMeme();
+    }
+}
+
+function handleTouchEnd() {
+    selectedTextIndex = -1;
+    drawMeme();
+}
+
+
+// --- Meme hochladen ---
+async function uploadMeme(imageDataUrl) {
+    if (!FRONTEND_API_KEY) {
+        alert('API Key nicht geladen. Bitte aktualisiere die Seite.');
+        console.error("API Key is missing for upload.");
+        return;
+    }
+
+    const uploadUrl = `${BACKEND_BASE_URL}/upload-meme/${currentRoomId}`;
+
+    try {
+        const response = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-API-Key': FRONTEND_API_KEY
+            },
+            body: JSON.stringify({ imageDataUrl })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            alert('Meme erfolgreich hochgeladen und auf der Social Wall verfügbar!');
+            console.log('Uploaded meme URL:', result.imageUrl);
+            // Optional: Weiterleitung zur Social Wall nach dem Upload
+            // window.location.href = `social-wall.html?room=${currentRoomId}`;
+        } else {
+            const errorData = await response.json();
+            throw new Error(`Upload failed: ${errorData.message}`);
+        }
+    } catch (error) {
+        console.error('Fehler beim Hochladen des Memes:', error);
+        alert(`Ein Fehler ist beim Hochladen des Memes aufgetreten: ${error.message || 'Unbekannter Fehler'}`);
+    }
+}
+
+
+// --- Initialisierung beim Laden der Seite ---
+document.addEventListener('DOMContentLoaded', () => {
+    initCanvas();
+    setupEventListeners();
 });

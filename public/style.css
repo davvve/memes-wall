@@ -315,3 +315,28 @@ body.social-wall {
     word-wrap: break-word;
     color: #eee;
 }
+
+/* NEU: Styles für den Löschen-Button */
+.delete-meme-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(255, 0, 0, 0.7); /* Roter Hintergrund mit Transparenz */
+    color: white;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 10px;
+    font-size: 0.9em;
+    cursor: pointer;
+    opacity: 0; /* Standardmäßig unsichtbar */
+    transition: opacity 0.3s ease;
+    z-index: 10; /* Stellen Sie sicher, dass es über dem Bild ist */
+}
+
+.meme-card:hover .delete-meme-btn {
+    opacity: 1; /* Bei Hover sichtbar */
+}
+
+.delete-meme-btn:hover {
+    background-color: rgba(255, 0, 0, 0.9); /* Dunkler bei Hover */
+}

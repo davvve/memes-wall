@@ -3,31 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hochzeits Meme Generator</title>
+    <title>Hochzeits-Meme Generator</title>
     <link rel="stylesheet" href="style.css">
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self';
+        script-src 'self' 'unsafe-inline';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: http://localhost:3000 https://memes-wall.onrender.com;
+        connect-src 'self' http://localhost:3000 https://memes-wall.onrender.com;
+    ">
 </head>
 <body>
     <div class="container">
-        <h1>Erstelle dein Hochzeits-Meme!</h1>
-
+        <h1>Meme für die Hochzeit erstellen</h1>
         <div class="meme-editor">
             <input type="file" id="imageUpload" accept="image/*">
-            <div id="imagePreview" class="image-preview">
-                <p>Bild hier hochladen oder ziehen</p>
+            <div class="image-preview" id="imagePreview">
+                <p>Bild hierher ziehen oder auswählen</p>
             </div>
-            <div id="memeCanvasContainer" class="meme-canvas-container" style="display: none;">
+
+            <div class="meme-canvas-container">
                 <canvas id="memeCanvas"></canvas>
             </div>
-            
-            <textarea id="memeText" placeholder="Dein Meme-Text hier..." rows="3"></textarea>
-            
+
+            <input type="text" id="topTextInput" placeholder="Oberer Text">
+            <input type="text" id="bottomTextInput" placeholder="Unterer Text">
+
             <div class="controls">
-                <label for="fontSize">Schriftgröße:</label>
-                <input type="range" id="fontSize" min="10" max="100" value="40">
-                <button id="addTextBtn">Text hinzufügen</button>
+                <label for="fontSizeControl">Textgröße:</label>
+                <input type="range" id="fontSizeControl" min="20" max="100" value="48">
             </div>
-            
-            <button id="generateMemeBtn">Meme generieren und teilen!</button>
+
+            <button id="generateAndSaveBtn">Meme erstellen und auf Wall posten</button>
         </div>
     </div>
 
