@@ -1,0 +1,317 @@
+/* ALLGEMEINE STYLES FÜR BEIDE SEITEN */
+body {
+    font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+    background-color: #1a1a1a; /* Sehr dunkler Hintergrund */
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    color: #f0f0f0; /* Heller Text für guten Kontrast */
+}
+
+/* AKZENTFARBE (Schlichtes Dunkelgrau mit Weiß) */
+:root {
+    --accent-color: #ffffff; /* Weiß als Akzentfarbe */
+    --accent-color-dark: #cccccc; /* Leicht gedämpftes Weiß für Hover-Effekte */
+    --border-color: #333333; /* Dunklerer Rand für Input-Felder, passt zum Hintergrund */
+    --input-bg-color: #222222; /* Hintergrund für Input-Felder, leicht heller als Body */
+    --text-placeholder-color: #888888; /* Dezente Platzhalterfarbe */
+    --button-text-color: #1a1a1a; /* Dunkler Text auf weißen Buttons */
+}
+
+/* CONTAINER FÜR DEN MEME-GENERATOR */
+.container {
+    background-color: transparent; /* KEIN HINTERGRUND */
+    padding: 30px;
+    border-radius: 8px;
+    box-shadow: none; /* KEIN SCHATTEN */
+    width: 100%;
+    max-width: 650px;
+    text-align: center;
+}
+
+h1 {
+    color: #ffffff; /* Weißer Titel */
+    margin-bottom: 25px;
+    font-weight: 600;
+}
+
+.meme-editor {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+input[type="file"] {
+    display: block;
+    width: calc(100% - 22px);
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: var(--input-bg-color);
+    font-size: 1em;
+    color: #f0f0f0;
+}
+
+input[type="file"]:hover {
+    background-color: #2a2a2a; /* Leichter Hover-Effekt */
+}
+
+.image-preview, .meme-canvas-container {
+    width: 100%;
+    height: 350px;
+    border: 1px dashed var(--border-color);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+    position: relative;
+    background-color: var(--input-bg-color);
+    border-radius: 5px;
+}
+
+.image-preview p {
+    color: var(--text-placeholder-color);
+    font-size: 1.1em;
+}
+
+#memeCanvas {
+    max-width: 100%;
+    max-height: 100%;
+    display: block;
+    margin: auto;
+}
+
+/* Stil für den Text auf dem Canvas (wird per JS hinzugefügt) */
+.meme-text-element {
+    position: absolute;
+    color: white; /* Text auf dem Meme bleibt weiß */
+    font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+    text-shadow:
+        -1px -1px 0 #000,
+         1px -1px 0 #000,
+        -1px  1px 0 #000,
+         1px  1px 0 #000,
+         0px  0px 4px #000;
+    cursor: grab;
+    white-space: nowrap;
+    user-select: none;
+    line-height: 1;
+}
+
+.resize-handle {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    width: 15px;
+    height: 15px;
+    background: var(--accent-color);
+    border: 1px solid #333; /* Dunkler Rand für Handle */
+    border-radius: 3px;
+    cursor: nwse-resize;
+    z-index: 10;
+}
+
+textarea {
+    width: calc(100% - 22px);
+    padding: 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 1em;
+    resize: vertical;
+    min-height: 90px;
+    color: #f0f0f0;
+    background-color: var(--input-bg-color);
+}
+
+textarea::placeholder {
+    color: var(--text-placeholder-color);
+}
+
+.controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.controls label {
+    font-weight: bold;
+    color: #f0f0f0;
+    white-space: nowrap;
+}
+
+input[type="range"] {
+    flex-grow: 1;
+    margin: 0 10px;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 8px;
+    background: var(--border-color);
+    border-radius: 5px;
+    outline: none;
+    opacity: 0.8;
+    transition: opacity .2s;
+}
+
+input[type="range"]:hover {
+    opacity: 1;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 0 0 2px #444; /* Etwas dunklerer Ring um den Daumen */
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    cursor: pointer;
+    box-shadow: 0 0 0 2px #444;
+}
+
+button {
+    background-color: var(--accent-color);
+    color: var(--button-text-color); /* Dunkler Text auf weißen Buttons */
+    padding: 12px 25px;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.05em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.1s ease;
+    flex-grow: 1;
+    min-width: 150px;
+}
+
+button:hover {
+    background-color: var(--accent-color-dark);
+    transform: translateY(-1px);
+}
+
+button:active {
+    transform: translateY(0);
+}
+
+#addTextBtn {
+    background-color: #555555; /* Mittleres Grau für "Text hinzufügen" */
+    color: #ffffff; /* Weißer Text auf diesem Button */
+}
+
+#addTextBtn:hover {
+    background-color: #4a4a4a;
+}
+
+#generateMemeBtn {
+    margin-top: 10px;
+}
+
+
+/* Mobil-Optimierung */
+@media (max-width: 600px) {
+    body {
+        padding: 10px;
+    }
+    .container {
+        padding: 20px;
+    }
+
+    h1 {
+        font-size: 1.6em;
+    }
+
+    .meme-editor {
+        gap: 15px;
+    }
+
+    button {
+        width: 100%;
+        margin-top: 10px;
+        font-size: 1em;
+        padding: 10px 20px;
+    }
+
+    .controls {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    input[type="range"] {
+        width: 100%;
+        margin: 5px 0;
+    }
+
+    .image-preview, .meme-canvas-container {
+        height: 250px;
+    }
+}
+
+/* --- SOCIAL WALL SPEZIFISCHES CSS (Unverändert, passt gut zum Thema) --- */
+body.social-wall {
+    background-color: #1a1a1a; /* Passt jetzt exakt zum Generator-Hintergrund */
+    color: #fff;
+    padding: 20px;
+    align-items: center;
+}
+
+#memeWall {
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    opacity: 0;
+    transition: opacity 1s ease-in-out;
+    column-count: 3;
+    column-gap: 20px;
+}
+
+@media (max-width: 900px) {
+    #memeWall {
+        column-count: 2;
+    }
+}
+
+@media (max-width: 600px) {
+    #memeWall {
+        column-count: 1;
+    }
+}
+
+#memeWall.loaded {
+    opacity: 1;
+}
+
+.meme-card {
+    background-color: #333;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    text-align: center;
+    margin-bottom: 20px;
+    break-inside: avoid-column;
+    overflow: hidden;
+}
+
+.meme-card img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+.meme-card p {
+    padding: 10px;
+    font-size: 1.2em;
+    word-wrap: break-word;
+    color: #eee;
+}

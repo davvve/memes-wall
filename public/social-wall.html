@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hochzeits Meme Wall</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="social-wall">
+    <div id="memeWall">
+        <p>Lade Memes...</p>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const memeWall = document.getElementById('memeWall');
+            // WICHTIG: Ersetze DIESEN PLATZHALTER durch die URL deines Render.com Backends!
+            // Beispiel: https://hochzeit-meme-backend.onrender.com
+            const BACKEND_BASE_URL = 'http://localhost:3000'; 
+            const FETCH_INTERVAL = 10000; // Alle 10 Sekunden neue Memes abrufen
+            let memes = [];
+            
+            async function fetchMemes() {
+                try {
+                    // Beachte den Endpunkt: '/memes-list', nicht '/memes'
+                    const response = await fetch(`${BACKEND_BASE_URL}/memes-list`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    const newMemes = await response.json();
+                    
+                    // Nur neue Memes hinzufügen und sortieren, damit die neuesten zuerst erscheinen
+                    // Wir müssen auch prüfen, ob sich die Reihenfolge geändert hat (z.B. neue Memes kommen)
+                    // Eine einfache Lösung, um Duplikate zu vermeiden und trotzdem neue Memes zu zeigen:
+                    const existingMemeUrls = new Set(memes);
+                    const newlyAddedMemes = newMemes.filter(url => !existingMemeUrls.has(url));
+
+                    if (newlyAddedMemes.length > 0 || newMemes.length !== memes.length) {
+                        // Füge neue Memes am Anfang hinzu und sorge für die richtige Sortierung
+                        // Oder lade einfach immer die komplette Liste neu, wenn sich was ändert.
+                        memes = newMemes; // Einfach die Liste komplett neu setzen
+                        renderMemes();
+                    }
+
+                } catch (error) {
+                    console.error('Fehler beim Abrufen der Memes:', error);
+                    memeWall.innerHTML = '<p style="color: red;">Fehler beim Laden der Memes.</p>';
+                }
+            }
+
+            function renderMemes() {
+                memeWall.innerHTML = ''; // Vorherige Memes entfernen
+                if (memes.length === 0) {
+                    memeWall.innerHTML = '<p>Noch keine Memes vorhanden. Sei der Erste!</p>';
+                    return;
+                }
+
+                memes.forEach(url => {
+                    const memeCard = document.createElement('div');
+                    memeCard.classList.add('meme-card');
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.alt = 'Hochzeit Meme';
+                    memeCard.appendChild(img);
+                    memeWall.appendChild(memeCard);
+                });
+                memeWall.classList.add('loaded'); // Wall einblenden
+            }
+
+            // Initiales Laden der Memes
+            fetchMemes();
+            // Regelmäßiges Abrufen neuer Memes
+            setInterval(fetchMemes, FETCH_INTERVAL);
+        });
+    </script>
+</body>
+</html>
