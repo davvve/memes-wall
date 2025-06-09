@@ -15,26 +15,27 @@
 </head>
 <body>
     <div class="container">
-        <h1>Meme für die Hochzeit erstellen</h1>
+        <h1>WEDDING MEMES</h1>
         <div class="meme-editor">
-            <input type="file" id="imageUpload" accept="image/*">
-            <div class="image-preview" id="imagePreview">
-                <p>Bild hierher ziehen oder auswählen</p>
-            </div>
+            <label for="imageUpload" class="custom-file-upload">
+                Bild auswählen
+            </label>
+            <input type="file" id="imageUpload" accept="image/*" style="display: none;">
+
+            <input type="text" id="topTextInput" placeholder="Oberer Text" class="text-input-field">
 
             <div class="meme-canvas-container">
                 <canvas id="memeCanvas"></canvas>
             </div>
 
-            <input type="text" id="topTextInput" placeholder="Oberer Text">
-            <input type="text" id="bottomTextInput" placeholder="Unterer Text">
+            <input type="text" id="bottomTextInput" placeholder="Unterer Text" class="text-input-field">
 
             <div class="controls">
                 <label for="fontSizeControl">Textgröße:</label>
                 <input type="range" id="fontSizeControl" min="20" max="100" value="48">
             </div>
 
-            <button id="generateAndSaveBtn">Meme erstellen und auf Wall posten</button>
+            <button id="generateAndSaveBtn">Meme erstellen und posten</button>
         </div>
     </div>
 

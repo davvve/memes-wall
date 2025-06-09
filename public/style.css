@@ -45,20 +45,50 @@ h1 {
     gap: 18px;
 }
 
-input[type="file"] {
-    display: block;
-    width: calc(100% - 22px);
-    padding: 10px;
-    border: 1px solid var(--border-color);
+.custom-file-upload {
+    background-color: var(--accent-color);
+    color: var(--button-text-color);
+    padding: 12px 25px;
+    border: none;
     border-radius: 5px;
+    font-size: 1.05em;
+    font-weight: 600;
     cursor: pointer;
-    background-color: var(--input-bg-color);
-    font-size: 1em;
-    color: #f0f0f0;
+    transition: background-color 0.3s ease, transform 0.1s ease;
+    display: block; /* Make it take full width like a button */
+    width: 100%; /* Adjust width to match other buttons/inputs */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+    text-align: center;
 }
 
-input[type="file"]:hover {
-    background-color: #2a2a2a; /* Leichter Hover-Effekt */
+.custom-file-upload:hover {
+    background-color: var(--accent-color-dark);
+    transform: translateY(-1px);
+}
+
+.custom-file-upload:active {
+    transform: translateY(0);
+}
+
+.text-input-field {
+    width: 100%; /* Full width */
+    padding: 12px 15px; /* Match button padding */
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 1.05em; /* Match button font size */
+    color: #f0f0f0;
+    background-color: var(--input-bg-color);
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+}
+
+.text-input-field::placeholder {
+    color: var(--text-placeholder-color);
+}
+
+.text-input-field:focus {
+    outline: none;
+    border-color: var(--accent-color); /* Highlight on focus */
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2); /* Subtle glow */
 }
 
 .image-preview, .meme-canvas-container {
