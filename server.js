@@ -6,6 +6,7 @@ const fs = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const axios = require('axios'); // Import axios for making HTTP requests
 require('dotenv').config();
 
 
@@ -75,6 +76,12 @@ app.use('/memes/:roomId/:filename', (req, res, next) => {
     express.static(roomMemesDir)(req, res, next);
 });
 
+// **3. Statische Dateibereitstellung für das Frontend (MUSS HIER NACH CORS und Memes-Serving stehen)**
+// Diese Routen müssen _nicht_ authentifiziert werden.
+if (process.env.NODE_ENV !== 'production') {
+    app.use(express.static(path.join(__dirname, 'public')));
+    console.log("Serving static files from /public for local development.");
+}
 
 // **3. Authentifizierungs-Middleware (Muss nach CORS und statischer Dateibereitstellung, aber vor den API-Routen kommen)**
 function authenticateApiKey(req, res, next) {
@@ -88,6 +95,9 @@ function authenticateApiKey(req, res, next) {
     }
 
     const providedApiKey = req.headers['x-api-key'] || req.query.api_key;
+    console.log(`[Auth Debug] Provided API Key: ${providedApiKey}`);
+    console.log(`[Auth Debug] Expected API Key: ${API_KEY}`);
+    console.log(`[Auth Debug] NODE_ENV: ${process.env.NODE_ENV}`);
 
     if (!providedApiKey || providedApiKey !== API_KEY) {
         console.warn(`Unauthorized API access attempt from IP: ${req.ip} (Provided Key: ${providedApiKey ? 'Yes' : 'No'}).`);
@@ -96,14 +106,7 @@ function authenticateApiKey(req, res, next) {
     next();
 }
 // Wende die API-Schutz-Middleware an. Sie muss HIER angewendet werden.
-app.use(authenticateApiKey);
 
-
-// **4. Sicherheits-Header (Helmet)**
-app.use(helmet());
-
-// **5. JSON Body Parser (für POST-Anfragen)**
-app.use(express.json({ limit: '50mb' }));
 
 // --- Rate Limiting für die API-Endpunkte ---
 const apiLimiter = rateLimit({
@@ -117,9 +120,34 @@ const uploadLimiter = rateLimit({
     max: 10,
     message: 'Zu viele Uploads von dieser IP, bitte versuchen Sie es später erneut.'
 });
+// **4. Sicherheits-Header (Helmet)**
+app.use(helmet());
 
-// Wende Rate Limiting auf die relevanten Routen an
-app.use(apiLimiter);
+// **6. Proxy-Endpunkt (für externe API-Anfragen vom Frontend)**
+// Dieser Endpunkt leitet Anfragen an externe APIs weiter, um CORS-Probleme zu vermeiden
+// und den API-Key des Backends zu schützen.
+app.get('/proxy', authenticateApiKey, apiLimiter, async (req, res) => {
+    const { url } = req.query;
+    if (!url) {
+        return res.status(400).json({ message: 'URL parameter is required for proxy.' });
+    }
+
+    try {
+        const response = await axios.get(url);
+        res.json(response.data);
+    } catch (error) {
+        console.error(`Proxy error for URL ${url}:`, error.message);
+        if (error.response) {
+            res.status(error.response.status).json(error.response.data);
+        } else {
+            res.status(500).json({ message: 'Proxy request failed', error: error.message });
+        }
+    }
+});
+// **5. JSON Body Parser (für POST-Anfragen)**
+app.use(express.json({ limit: '50mb' }));
+
+// --- Rate Limiting für die API-Endpunkte ---
 
 
 // --- API-Routen (alle nachfolgenden Routen sind geschützt) ---

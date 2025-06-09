@@ -9,13 +9,18 @@
         default-src 'self';
         script-src 'self' 'unsafe-inline';
         style-src 'self' 'unsafe-inline';
-        img-src 'self' data: http://localhost:3000 https://memes-wall.onrender.com;
-        connect-src 'self' http://localhost:3000 https://memes-wall.onrender.com;
+        img-src 'self' data: http://localhost:3000 https://memes-wall.onrender.com https://fotoshare.co;
+        connect-src 'self' http://localhost:3000 https://memes-wall.onrender.com https://fotoshare.co;
     ">
 </head>
 <body>
     <div class="container">
         <h1>WEDDING MEMES</h1>
+        <nav>
+            <a href="index.html">Home</a>
+            <a href="social-wall.html">Social Wall</a>
+            <a href="photo-gallery.html">Photo Gallery</a>
+        </nav>
         <div class="meme-editor">
             <label for="imageUpload" class="custom-file-upload">
                 Bild auswählen
