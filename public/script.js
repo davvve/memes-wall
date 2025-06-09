@@ -376,6 +376,7 @@ async function uploadMeme(imageDataUrl) {
             const result = await response.json();
             alert('Meme erfolgreich hochgeladen und auf der Social Wall verfügbar!');
             console.log('Uploaded meme URL:', result.imageUrl);
+            resetMemeEditor(); // Reset the editor after successful upload
             // Optional: Weiterleitung zur Social Wall nach dem Upload
             // window.location.href = `social-wall.html?room=${currentRoomId}`;
         } else {
@@ -388,6 +389,30 @@ async function uploadMeme(imageDataUrl) {
     }
 }
 
+// --- Editor zurücksetzen ---
+function resetMemeEditor() {
+    currentImage = null; // Bild zurücksetzen
+    ctx.clearRect(0, 0, memeCanvas.width, memeCanvas.height); // Canvas leeren
+    memeCanvas.width = 600; // Standardgröße wiederherstellen
+    memeCanvas.height = 400;
+
+    topTextInput.value = ''; // Textfelder leeren
+    bottomTextInput.value = '';
+    fontSizeControl.value = '60'; // Schriftgröße zurücksetzen
+
+    // Initialisiere memeTexts neu mit leeren Werten und Standardpositionen
+    memeTexts = [
+        { text: '', x: memeCanvas.width / 2, y: memeCanvas.height * 0.15, size: 60, color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'top' },
+        { text: '', x: memeCanvas.width / 2, y: memeCanvas.height * 0.85, size: 60, color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'bottom' }
+    ];
+    selectedTextIndex = -1; // Keine Textauswahl
+
+    imageUpload.value = ''; // Dateiauswahlfeld zurücksetzen
+    imageUploadArea.classList.remove('has-image'); // Placeholder wieder anzeigen
+    imageUploadArea.classList.remove('drag-over'); // Drag-over-Klasse entfernen
+
+    initCanvas(); // Canvas neu initialisieren (zeichnet den leeren Zustand)
+}
 
 // --- Initialisierung beim Laden der Seite ---
 document.addEventListener('DOMContentLoaded', () => {
