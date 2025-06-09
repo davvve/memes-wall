@@ -14,8 +14,9 @@ const FRONTEND_API_KEY = '0a7db09c6859445f802cf0ea4836507f';
 
 // --- DOM-Elemente abrufen ---
 const imageUpload = document.getElementById('imageUpload');
-const imagePreview = document.getElementById('imagePreview');
 const memeCanvas = document.getElementById('memeCanvas');
+const imageUploadArea = document.querySelector('.image-upload-area'); // Get the new clickable area
+const uploadPlaceholder = document.getElementById('uploadPlaceholder'); // Get the placeholder text
 const ctx = memeCanvas.getContext('2d');
 const topTextInput = document.getElementById('topTextInput');
 const bottomTextInput = document.getElementById('bottomTextInput');
@@ -47,30 +48,34 @@ function initCanvas() {
     memeCanvas.width = 600;
     memeCanvas.height = 400;
     ctx.clearRect(0, 0, memeCanvas.width, memeCanvas.height);
-    drawPlaceholderText();
+    // Placeholder text is now handled by HTML/CSS
 }
 
-function drawPlaceholderText() {
-    ctx.fillStyle = '#ccc';
-    ctx.font = '24px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Lade ein Bild hoch, um dein Meme zu erstellen.', memeCanvas.width / 2, memeCanvas.height / 2);
-}
+// Removed drawPlaceholderText function as it's now handled by HTML/CSS
 
 function setupEventListeners() {
-    // Bild-Upload per Drag & Drop
-    imagePreview.addEventListener('dragover', (e) => {
+    // Bild-Upload per Drag & Drop auf den neuen Bereich
+    imageUploadArea.addEventListener('dragover', (e) => {
         e.preventDefault();
-        imagePreview.classList.add('drag-over');
+        imageUploadArea.classList.add('drag-over');
     });
-    imagePreview.addEventListener('dragleave', () => {
-        imagePreview.classList.remove('drag-over');
+    imageUploadArea.addEventListener('dragleave', () => {
+        imageUploadArea.classList.remove('drag-over');
     });
-    imagePreview.addEventListener('drop', (e) => {
+    imageUploadArea.addEventListener('drop', (e) => {
         e.preventDefault();
-        imagePreview.classList.remove('drag-over');
+        imageUploadArea.classList.remove('drag-over');
         if (e.dataTransfer.files.length > 0) {
             handleImageFile(e.dataTransfer.files[0]);
+        }
+    });
+
+    // Explicitly trigger file input when the image upload area is clicked
+    imageUploadArea.addEventListener('click', (e) => {
+        // Only trigger file input if the click is not on the canvas itself (for text dragging)
+        // and if no image is loaded (i.e., placeholder is visible)
+        if (e.target === imageUploadArea || e.target === uploadPlaceholder) {
+            imageUpload.click();
         }
     });
 
@@ -143,19 +148,19 @@ function handleImageFile(file) {
 
                 // Setze die initialen Textfelder zurück oder neu
                 memeTexts = [
-                    { text: topTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: 50, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'top' },
-                    { text: bottomTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: memeCanvas.height - 30, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'bottom' }
+                    { text: topTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: memeCanvas.height * 0.15, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'top' },
+                    { text: bottomTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: memeCanvas.height * 0.85, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'bottom' }
                 ];
                 drawMeme();
             };
             img.src = e.target.result;
         };
         reader.readAsDataURL(file);
-        imagePreview.innerHTML = ''; // Leere den Vorschau-Text
-        imagePreview.style.border = 'none'; // Entferne den gestrichelten Rahmen
+        imageUploadArea.classList.add('has-image'); // Add class to hide placeholder
     } else {
         alert('Bitte wähle eine Bilddatei aus.');
         imageUpload.value = '';
+        imageUploadArea.classList.remove('has-image'); // Ensure placeholder is visible if upload fails
     }
 }
 
@@ -166,7 +171,7 @@ function drawMeme(isFinalRender = false) {
     if (currentImage) {
         ctx.drawImage(currentImage, 0, 0, memeCanvas.width, memeCanvas.height);
     } else {
-        drawPlaceholderText();
+        // Placeholder text is now handled by HTML/CSS
         return; // Kein Bild, kein Meme
     }
 
@@ -310,7 +315,6 @@ function handleMouseUp() {
 
 // --- Touch Event Handlers ---
 function handleTouchStart(e) {
-    e.preventDefault(); // Verhindert Scrolling/Zooming des Browsers bei Touch
     const touch = e.touches[0];
     const rect = memeCanvas.getBoundingClientRect();
     const touchX = touch.clientX - rect.left;
@@ -319,10 +323,12 @@ function handleTouchStart(e) {
     selectedTextIndex = getClickedTextIndex(touchX, touchY);
 
     if (selectedTextIndex !== -1) {
+        e.preventDefault(); // Only prevent default if a text is selected for dragging
         const textObj = memeTexts[selectedTextIndex];
         dragOffsetX = touchX - textObj.x;
         dragOffsetY = touchY - textObj.y;
     }
+    // If no text is selected, allow default behavior (e.g., label click)
 }
 
 function handleTouchMove(e) {
