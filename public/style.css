@@ -346,6 +346,8 @@ body.social-wall {
 
 .meme-card img {
     max-width: 100%;
+    max-height: 550px; /* Bilder auf der Social Wall etwas kleiner machen */
+    object-fit: contain; /* Bild proportional skalieren, ohne es zu beschneiden */
     height: auto;
     display: block;
 }
