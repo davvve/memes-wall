@@ -41,6 +41,15 @@ function getRoomMemesDir(roomId) {
     return path.join(storageBasePath, 'memes', sanitizedRoomId);
 }
 
+function getRoomPhotosDir(roomId) {
+    const sanitizedRoomId = roomId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!sanitizedRoomId) {
+        console.warn(`Invalid or empty roomId provided: "${roomId}". Using 'default' room for photos.`);
+        return path.join(storageBasePath, 'photos', 'default');
+    }
+    return path.join(storageBasePath, 'photos', sanitizedRoomId);
+}
+
 // --- Middleware Konfiguration ---
 
 // **1. CORS Middleware (MUSS ZUERST SEIN, um Preflight-Anfragen korrekt zu behandeln)**
@@ -70,20 +79,68 @@ app.use('/memes/:roomId/:filename', (req, res, next) => {
     const roomMemesDir = getRoomMemesDir(roomId);
     
     // Setze den Request-Pfad auf den relativen Pfad der Datei innerhalb des Raumverzeichnisses
-    req.url = `/${filename}`; 
+    req.url = `/${filename}`;
     
     // Liefere die Datei aus dem spezifischen Raumverzeichnis
     express.static(roomMemesDir)(req, res, next);
 });
 
-// **3. Statische Dateibereitstellung für das Frontend (MUSS HIER NACH CORS und Memes-Serving stehen)**
+// **3. Statische Dateibereitstellung für Fotos (MUSS HIER VOR der API-Key Authentifizierung stehen)**
+// Diese Route muss _nicht_ authentifiziert werden, da sie direkt von <img> Tags aufgerufen wird.
+app.use('/photos/:roomId/:filename', (req, res, next) => {
+    const roomId = req.params.roomId;
+    const filename = req.params.filename;
+    const roomPhotosDir = getRoomPhotosDir(roomId);
+    
+    // Setze den Request-Pfad auf den relativen Pfad der Datei innerhalb des Raumverzeichnisses
+    req.url = `/${filename}`;
+    
+    // Liefere die Datei aus dem spezifischen Raumverzeichnis
+    express.static(roomPhotosDir)(req, res, next);
+});
+app.get('/photos-list/:roomId', async (req, res) => {
+    const roomId = req.params.roomId;
+
+    if (!roomId) {
+        return res.status(400).json({ message: 'Room ID is required.' });
+    }
+
+    const roomPhotosDir = getRoomPhotosDir(roomId);
+
+    try {
+        const files = await fs.readdir(roomPhotosDir);
+        // Filter for common image extensions, adjust as needed
+        const photoFiles = files.filter(file =>
+            file.endsWith('.png') ||
+            file.endsWith('.jpg') ||
+            file.endsWith('.jpeg') ||
+            file.endsWith('.gif') ||
+            file.endsWith('.webp')
+        ).sort((a, b) => b.localeCompare(a)); // Newest first
+
+        const backendBaseUrl = process.env.BACKEND_BASE_URL || `http://localhost:${PORT}`;
+        const photoUrls = photoFiles.map(file => {
+            return `${backendBaseUrl}/photos/${roomId}/${file}`;
+        });
+        res.json(photoUrls);
+    } catch (err) {
+        if (err.code === 'ENOENT') {
+            console.log(`No photos found for room: ${roomId} (directory ${roomPhotosDir} does not exist).`);
+            return res.json([]);
+        }
+        console.error('Error reading photos directory for room:', err);
+        res.status(500).json({ message: 'Failed to retrieve photos for room.' });
+    }
+});
+
+// **4. Statische Dateibereitstellung für das Frontend (MUSS HIER NACH CORS und Memes-Serving stehen)**
 // Diese Routen müssen _nicht_ authentifiziert werden.
 if (process.env.NODE_ENV !== 'production') {
     app.use(express.static(path.join(__dirname, 'public')));
     console.log("Serving static files from /public for local development.");
 }
 
-// **3. Authentifizierungs-Middleware (Muss nach CORS und statischer Dateibereitstellung, aber vor den API-Routen kommen)**
+// **5. Authentifizierungs-Middleware (Muss nach CORS und statischer Dateibereitstellung, aber vor den API-Routen kommen)**
 function authenticateApiKey(req, res, next) {
     // WICHTIG: Erlaube OPTIONS-Anfragen (Preflight) ohne API-Key.
     if (req.method === 'OPTIONS') {
@@ -218,10 +275,12 @@ app.get('/memes-list/:roomId', async (req, res) => {
     }
 });
 
+
+
+
 app.delete('/delete-meme/:roomId/:filename', async (req, res) => {
     const roomId = req.params.roomId;
     const filename = req.params.filename;
-
     if (!roomId || !filename) {
         return res.status(400).json({ message: 'Room ID and filename are required.' });
     }

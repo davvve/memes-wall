@@ -1,27 +1,37 @@
+// Konfiguration des Backends (Backend-URL von Render.com)
+let BACKEND_BASE_URL;
+if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    BACKEND_BASE_URL = 'http://localhost:3000'; // Lokale Entwicklung
+} else {
+    // Für Render.com Produktionsumgebung
+    BACKEND_BASE_URL = 'https://memes-wall.onrender.com'; // <--- HIER ANPASSEN!
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const gallery = document.getElementById('photo-gallery');
-    const photoShareUrl = 'https://fotoshare.co/u/86712254/6289822';
+    function getRoomIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const roomId = params.get('room');
+        if (!roomId) {
+            console.warn("No 'room' parameter found in URL for photo gallery. Using 'default' room.");
+            return 'default';
+        }
+        return roomId.replace(/[^a-zA-Z0-9_-]/g, '');
+    }
+
+    const roomId = getRoomIdFromUrl();
+    const localPhotosApiUrl = `${BACKEND_BASE_URL}/photos-list/${roomId}`;
 
     async function fetchPhotos() {
         try {
-            // Using a proxy to bypass CORS issues for fetching external content
-            const API_KEY = '0a7db09c6859445f802cf0ea4836507f'; // Hardcoded API key from .env
-            const proxyUrl = `http://localhost:3000/proxy?url=${encodeURIComponent(photoShareUrl)}&api_key=${API_KEY}`;
-            const response = await fetch(proxyUrl);
+            const response = await fetch(localPhotosApiUrl);
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const html = await response.text();
+            const photos = await response.json();
             
-            // Parse the HTML to extract image URLs
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            const imageElements = doc.querySelectorAll('.image-grid img'); // Adjust selector if needed
-
-            const photos = Array.from(imageElements).map(img => img.src);
-
-            // Display photos, newest first (assuming the order in the HTML is oldest first)
-            displayPhotos(photos.reverse());
+            // Display photos, newest first (assuming the server returns them newest first)
+            displayPhotos(photos);
 
         } catch (error) {
             console.error('Error fetching photos:', error);
@@ -48,8 +58,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectButton = document.createElement('button');
             selectButton.textContent = 'Select for Meme';
             selectButton.addEventListener('click', () => {
-                alert(`Selected photo: ${photoUrl} (Meme generation feature coming soon!)`);
-                // TODO: Implement actual meme generation logic here
+                window.location.href = `index.html?imageUrl=${encodeURIComponent(photoUrl)}&room=${encodeURIComponent(roomId)}`;
             });
 
             photoContainer.appendChild(img);

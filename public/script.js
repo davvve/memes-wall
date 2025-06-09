@@ -78,9 +78,8 @@ function setupEventListeners() {
 
     // Explicitly trigger file input when the image upload area is clicked
     imageUploadArea.addEventListener('click', (e) => {
-        // Only trigger file input if the click is not on the canvas itself (for text dragging)
-        // and if no image is loaded (i.e., placeholder is visible)
-        if (e.target === imageUploadArea || e.target === uploadPlaceholder) {
+        // Only trigger file input if no image is currently loaded
+        if (!currentImage && (e.target === imageUploadArea || e.target === uploadPlaceholder)) {
             imageUpload.click();
         }
     });
@@ -122,52 +121,63 @@ function setupEventListeners() {
 }
 
 // --- Bildhandling ---
+function loadImageToCanvas(img) {
+    currentImage = img;
+    const maxWidth = 800;
+    const maxHeight = 700;
+
+    let width = img.width;
+    let height = img.height;
+
+    if (width > maxWidth) {
+        height = height * (maxWidth / width);
+        width = maxWidth;
+    }
+    if (height > maxHeight) {
+        width = width * (maxHeight / height);
+        height = maxHeight;
+    }
+    
+    width = Math.max(width, 300);
+    height = Math.max(height, 200);
+
+    memeCanvas.width = width;
+    memeCanvas.height = height;
+
+    memeTexts = [
+        { text: topTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: memeCanvas.height * 0.15, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'top' },
+        { text: bottomTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: memeCanvas.height * 0.85, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'bottom' }
+    ];
+    drawMeme();
+    imageUploadArea.classList.add('has-image');
+}
+
 function handleImageFile(file) {
     if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
-            img.onload = () => {
-                currentImage = img;
-                // Passe Canvas-Größe an Bild an, aber skaliere, wenn zu groß
-                const maxWidth = 800; // Etwas breiter als vorher für mehr Flexibilität
-                const maxHeight = 700; 
-
-                let width = img.width;
-                let height = img.height;
-
-                if (width > maxWidth) {
-                    height = height * (maxWidth / width);
-                    width = maxWidth;
-                }
-                if (height > maxHeight) {
-                    width = width * (maxHeight / height);
-                    height = maxHeight;
-                }
-                
-                // Mindestgröße für das Canvas, damit es immer sichtbar ist
-                width = Math.max(width, 300);
-                height = Math.max(height, 200);
-
-                memeCanvas.width = width;
-                memeCanvas.height = height;
-
-                // Setze die initialen Textfelder zurück oder neu
-                memeTexts = [
-                    { text: topTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: memeCanvas.height * 0.15, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'top' },
-                    { text: bottomTextInput.value.toUpperCase(), x: memeCanvas.width / 2, y: memeCanvas.height * 0.85, size: parseInt(fontSizeControl.value), color: 'white', font: 'Impact', align: 'center', stroke: 'black', strokeWidth: 4, type: 'bottom' }
-                ];
-                drawMeme();
-            };
+            img.onload = () => loadImageToCanvas(img);
             img.src = e.target.result;
         };
         reader.readAsDataURL(file);
-        imageUploadArea.classList.add('has-image'); // Add class to hide placeholder
     } else {
         alert('Bitte wähle eine Bilddatei aus.');
         imageUpload.value = '';
-        imageUploadArea.classList.remove('has-image'); // Ensure placeholder is visible if upload fails
+        imageUploadArea.classList.remove('has-image');
     }
+}
+
+function loadImageFromUrl(url) {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous'; // Wichtig für CORS, wenn Bilder von externen Quellen geladen werden
+    img.onload = () => loadImageToCanvas(img);
+    img.onerror = () => {
+        alert('Fehler beim Laden des Bildes von der URL. Bitte versuche es erneut oder wähle ein anderes Bild.');
+        console.error('Error loading image from URL:', url);
+        resetMemeEditor(); // Editor zurücksetzen, wenn Bild nicht geladen werden kann
+    };
+    img.src = url;
 }
 
 // --- Meme zeichnen ---
@@ -422,7 +432,13 @@ function resetMemeEditor() {
 document.addEventListener('DOMContentLoaded', () => {
     initCanvas();
     setupEventListeners();
-    setupModalEventListeners(); // Setup modal event listeners
+    setupModalEventListeners();
+
+    const params = new URLSearchParams(window.location.search);
+    const imageUrl = params.get('imageUrl');
+    if (imageUrl) {
+        loadImageFromUrl(decodeURIComponent(imageUrl));
+    }
 });
 
 // --- Modal Funktionen ---
