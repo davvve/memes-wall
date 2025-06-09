@@ -310,7 +310,7 @@ body.social-wall {
 
 #memeWall {
     width: 100%;
-    max-width: 1200px;
+    max-width: 100%;
     margin: 0 auto;
     opacity: 0;
     transition: opacity 1s ease-in-out;
