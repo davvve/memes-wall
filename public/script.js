@@ -23,6 +23,12 @@ const bottomTextInput = document.getElementById('bottomTextInput');
 const fontSizeControl = document.getElementById('fontSizeControl');
 const generateAndSaveBtn = document.getElementById('generateAndSaveBtn');
 
+// Modal Elemente
+const successModal = document.getElementById('successModal');
+const closeModalBtn = document.querySelector('#successModal .close-button');
+const goToSocialWallBtn = document.getElementById('goToSocialWallBtn');
+const closeButtonModal = document.getElementById('closeModalBtn');
+
 let currentImage = null; // Das geladene Bildobjekt
 let memeTexts = []; // Array zum Speichern der Textfelder {text, x, y, size, color, font, align, stroke, strokeWidth}
 let selectedTextIndex = -1; // Index des aktuell ausgewählten/gezogenen Textfeldes
@@ -374,11 +380,9 @@ async function uploadMeme(imageDataUrl) {
 
         if (response.ok) {
             const result = await response.json();
-            alert('Meme erfolgreich hochgeladen und auf der Social Wall verfügbar!');
+            showSuccessModal(); // Show modal instead of alert
             console.log('Uploaded meme URL:', result.imageUrl);
             resetMemeEditor(); // Reset the editor after successful upload
-            // Optional: Weiterleitung zur Social Wall nach dem Upload
-            // window.location.href = `social-wall.html?room=${currentRoomId}`;
         } else {
             const errorData = await response.json();
             throw new Error(`Upload failed: ${errorData.message}`);
@@ -418,4 +422,30 @@ function resetMemeEditor() {
 document.addEventListener('DOMContentLoaded', () => {
     initCanvas();
     setupEventListeners();
+    setupModalEventListeners(); // Setup modal event listeners
 });
+
+// --- Modal Funktionen ---
+function showSuccessModal() {
+    successModal.style.display = 'flex'; // Use flex to center
+}
+
+function hideSuccessModal() {
+    successModal.style.display = 'none';
+}
+
+
+function setupModalEventListeners() {
+    closeModalBtn.addEventListener('click', hideSuccessModal);
+    closeButtonModal.addEventListener('click', hideSuccessModal);
+    goToSocialWallBtn.addEventListener('click', () => {
+        window.location.href = `social-wall.html?room=${currentRoomId}`;
+    });
+
+    // Close modal if user clicks outside of it
+    window.addEventListener('click', (event) => {
+        if (event.target === successModal) {
+            hideSuccessModal();
+        }
+    });
+}
